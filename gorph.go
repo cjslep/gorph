@@ -30,8 +30,8 @@ func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp I
 		auxGridDest := newFloat64CoordinateGrid()
 
 		// TODO: Factory creation function
-		auxSourceImage := image.NewNRGBA64(startBounds)
-		auxDestImage := image.NewNRGBA64(destBounds)
+		auxSourceImage := image.NewRGBA64(startBounds)
+		auxDestImage := image.NewRGBA64(destBounds)
 
 		// TODO: Do this somewhere else
 		maxX := intermedGrid.VerticalGridlineCount()
@@ -93,7 +93,7 @@ func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp I
 	return nil
 }
 
-func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*sortedFloat64Line, start image.Image, aux *image.NRGBA64) error {
+func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*sortedFloat64Line, start image.Image, aux *image.RGBA64) error {
 	nSplinesGrid := len(originalSplines)
 	for y := yStart; y < yEnd; y++ {
 		// For each line:
@@ -171,35 +171,116 @@ func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*
 	return nil
 }
 
-/*
-func mergePixels(horizontally, fadeStartPixel, fadeEndPixel bool, origStart, origEnd, destStart, destEnd float64, original image.Image, dest *image.NRGBA64) {
-	pixelOrigStart := int(math.Floor(origStart))
-	pixelOrigEnd := int(math.Floor(origEnd))
-	pixelDestStart := int(math.Floor(destStart))
-	pixelDestEnd := int(math.Floor(destEnd))
-}*/
+func mergePixelsInLine(horizontally bool, line int, fadeStartPixel, fadeEndPixel bool, origStart, origEnd, destStart, destEnd float64, original image.Image, dest *image.RGBA64) {
+	pixelOrigSnapStart := int(math.Floor(origStart)) + 1
+	pixelOrigSnapEnd := int(math.Floor(origEnd)) + 1
+	var origColor color.Color
+	lastColoredDestPixel := int(math.Floor(destStart))
+	if !fadeStartPixel {
+		lastColoredDestPixel--
+	}
+	for iOrig := pixelOrigSnapStart; iOrig <= pixelOrigSnapEnd; iOrig++ {
+		if horizontally {
+			origColor = original.At(iOrig - 1, line)
+		} else {
+			origColor = original.At(line, iOrig - 1)
+		}
+
+		pct := (float64(iOrig) - origStart) / (origEnd - origStart)
+		wOrig := 1.0
+		// TODO: Adjust wOrig for first/last in orig
+		if iOrig == pixelOrigSnapStart {
+			wOrig = 1 - (origStart - math.Floor(origStart))
+		} else if iOrig == pixelOrigSnapEnd {
+			wOrig = origEnd - math.Floor(origEnd)
+		}
+		wDest := wOrig / (origEnd - origStart) * (destEnd - destStart)
+		iEndDest := int(math.Floor(pct * (destEnd - destStart) + destStart))
+		iStartDest := int(math.Floor(float64(iEndDest) - wDest))
+		wDestFrac := float64(iEndDest) - wDest - float64(iStartDest)
+		for iDest := iStartDest; iDest <= iEndDest; iDest++ {
+			if iDest == iEndDest && iStartDest != iEndDest {
+				wDestFrac = pct * (destEnd - destStart) + destStart - float64(iEndDest)
+			}
+			if iDest > lastColoredDestPixel && (!fadeEndPixel || (fadeEndPixel && iDest != iEndDest)) {
+				if horizontally {
+					dest.Set(iDest, line, weightColor(origColor, wDestFrac))
+				} else {
+					dest.Set(line, iDest, weightColor(origColor, wDestFrac))
+				}
+				lastColoredDestPixel = iDest
+			} else {
+				pastColor := dest.At(iDest, line)
+				if iDest > lastColoredDestPixel && fadeEndPixel && iDest == iEndDest {
+					lastColoredDestPixel = iDest
+				}
+				if horizontally {
+					dest.Set(iDest, line, addColors(pastColor, weightColor(origColor, wDestFrac)))
+				} else {
+					dest.Set(line, iDest, addColors(pastColor, weightColor(origColor, wDestFrac)))
+				}
+			}
+			wDestFrac = 1
+		}
+	}
+}
+
+func weightColor(colorWeighted color.Color, weight float64) color.Color {
+	r, g, b, a := colorWeighted.RGBA()
+	rRes := multiplyCeilingOverflow(r, weight)
+	gRes := multiplyCeilingOverflow(g, weight)
+	bRes := multiplyCeilingOverflow(b, weight)
+	aRes := multiplyCeilingOverflow(a, weight)
+	return color.RGBA64{rRes, gRes, bRes, aRes}
+}
+
+func addColors(colorOne, colorTwo color.Color) color.Color {
+	r, g, b, a := colorOne.RGBA()
+	rOther, gOther, bOther, aOther := colorTwo.RGBA()
+	rRes := uint32ToUint16CeilingOverflow(addCeilingOverflow32(r, rOther))
+	gRes := uint32ToUint16CeilingOverflow(addCeilingOverflow32(g, gOther))
+	bRes := uint32ToUint16CeilingOverflow(addCeilingOverflow32(b, bOther))
+	aRes := uint32ToUint16CeilingOverflow(addCeilingOverflow32(a, aOther))
+	return color.RGBA64{rRes, gRes, bRes, aRes}
+}
 
 func interpolateColors(colorWeighted, colorOther color.Color, weight float64) color.Color {
 	r, g, b, a := colorWeighted.RGBA()
 	rOther, gOther, bOther, aOther := colorOther.RGBA()
-	rRes := addCeilingOverflow(multiplyCeilingOverflow(r, weight), multiplyCeilingOverflow(rOther, 1.0-weight))
-	gRes := addCeilingOverflow(multiplyCeilingOverflow(g, weight), multiplyCeilingOverflow(gOther, 1.0-weight))
-	bRes := addCeilingOverflow(multiplyCeilingOverflow(b, weight), multiplyCeilingOverflow(bOther, 1.0-weight))
-	aRes := addCeilingOverflow(multiplyCeilingOverflow(a, weight), multiplyCeilingOverflow(aOther, 1.0-weight))
-	return color.NRGBA64{rRes, gRes, bRes, aRes}
+	rRes := addCeilingOverflow16(multiplyCeilingOverflow(r, weight), multiplyCeilingOverflow(rOther, 1.0-weight))
+	gRes := addCeilingOverflow16(multiplyCeilingOverflow(g, weight), multiplyCeilingOverflow(gOther, 1.0-weight))
+	bRes := addCeilingOverflow16(multiplyCeilingOverflow(b, weight), multiplyCeilingOverflow(bOther, 1.0-weight))
+	aRes := addCeilingOverflow16(multiplyCeilingOverflow(a, weight), multiplyCeilingOverflow(aOther, 1.0-weight))
+	return color.RGBA64{rRes, gRes, bRes, aRes}
 }
 
 func multiplyCeilingOverflow(value uint32, weight float64) uint16 {
-	ret := uint16(float64(value) * weight)
+	ret := uint16(float64(value) * weight + 0.5)
 	if math.Floor(weight) != 0.0 && uint32(float64(ret)/math.Floor(weight)) != value {
 		ret = 1<<16 - 1 // Overflow, return largest number possible
 	}
 	return ret
 }
 
-func addCeilingOverflow(value uint16, value2 uint16) uint16 {
+func addCeilingOverflow16(value uint16, value2 uint16) uint16 {
 	ret := value + value2
 	if ret < value || ret < value2 {
+		ret = 1<<16 - 1 // Overflow, return largest number possible
+	}
+	return ret
+}
+
+func addCeilingOverflow32(value uint32, value2 uint32) uint32 {
+	ret := value + value2
+	if ret < value || ret < value2 {
+		ret = 1<<32 - 1 // Overflow, return largest number possible
+	}
+	return ret
+}
+
+func uint32ToUint16CeilingOverflow(value uint32) uint16 {
+	ret := uint16(value)
+	if uint32(ret) != value {
 		ret = 1<<16 - 1 // Overflow, return largest number possible
 	}
 	return ret

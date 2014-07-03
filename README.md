@@ -25,7 +25,7 @@ This library is still unstable, please do not hesitate to contact me with questi
 License
 ---
 
-Gorph is released under the [MIT Expat License](./LICENSE), a permissive free software license. Contributing back to the source is appreciated greatly, but not dictated by the license. A copy of the license is distributed with the source code.
+Gorph is released under the [MIT Expat License](./LICENSE), a permissive free software license. Contributing back to the source is appreciated greatly, but not demanded by the license. A copy of the license is distributed with the source code.
 
 <a name="dependencies"/>
 Dependencies
@@ -37,7 +37,7 @@ At this time, no additional dependencies are required beyond the golang standard
 Installation
 ---
 
-If Go is not installed, (please do so first)[http://golang.org/doc/install].
+If Go is not installed, [please do so first](http://golang.org/doc/install).
 
 To download the source, use the command:
 ```
