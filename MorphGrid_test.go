@@ -163,19 +163,19 @@ func TestMorphGridInterpolatedGrid(t *testing.T) {
 	m.AddPoints(3, 4, image.Point{2, 2}, image.Point{4, 6})
 	m.AddPoints(4, 4, image.Point{5, 7}, image.Point{6, 10})
 	g := m.interpolatedGrid(LinearInterpolation, 0.5)
-	AssertEqualsInt(t, g.VerticalGridlineCount(), m.VerticalGridlineCount(), "Interpolated/Morph grid mismatch")
-	AssertEqualsInt(t, g.HorizontalGridlineCount(), m.HorizontalGridlineCount(), "Interpolated/Morph grid mismatch")
-	p1, err := g.Point(3, 2)
+	AssertEqualsInt(t, g.verticalGridlineCount(), m.VerticalGridlineCount(), "Interpolated/Morph grid mismatch")
+	AssertEqualsInt(t, g.horizontalGridlineCount(), m.HorizontalGridlineCount(), "Interpolated/Morph grid mismatch")
+	p1, err := g.point(3, 2)
 	if err != nil {
 		LogVerbose(t, err.Error())
 		t.Fail()
 	}
-	p2, err := g.Point(3, 4)
+	p2, err := g.point(3, 4)
 	if err != nil {
 		LogVerbose(t, err.Error())
 		t.Fail()
 	}
-	p3, err := g.Point(4, 4)
+	p3, err := g.point(4, 4)
 	if err != nil {
 		LogVerbose(t, err.Error())
 		t.Fail()
@@ -184,19 +184,19 @@ func TestMorphGridInterpolatedGrid(t *testing.T) {
 	AssertEqualsFloat64PointTolerance(t, p2, Float64Point{3.0, 4.0}, 0.000001, "Interpolation point incorrect")
 	AssertEqualsFloat64PointTolerance(t, p3, Float64Point{5.5, 8.5}, 0.000001, "Interpolation point incorrect")
 	g = m.interpolatedGrid(LinearInterpolation, 0.25)
-	AssertEqualsInt(t, g.VerticalGridlineCount(), m.VerticalGridlineCount(), "Interpolated/Morph grid mismatch")
-	AssertEqualsInt(t, g.HorizontalGridlineCount(), m.HorizontalGridlineCount(), "Interpolated/Morph grid mismatch")
-	p1, err = g.Point(3, 2)
+	AssertEqualsInt(t, g.verticalGridlineCount(), m.VerticalGridlineCount(), "Interpolated/Morph grid mismatch")
+	AssertEqualsInt(t, g.horizontalGridlineCount(), m.HorizontalGridlineCount(), "Interpolated/Morph grid mismatch")
+	p1, err = g.point(3, 2)
 	if err != nil {
 		LogVerbose(t, err.Error())
 		t.Fail()
 	}
-	p2, err = g.Point(3, 4)
+	p2, err = g.point(3, 4)
 	if err != nil {
 		LogVerbose(t, err.Error())
 		t.Fail()
 	}
-	p3, err = g.Point(4, 4)
+	p3, err = g.point(4, 4)
 	if err != nil {
 		LogVerbose(t, err.Error())
 		t.Fail()

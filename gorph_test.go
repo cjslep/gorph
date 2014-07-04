@@ -50,20 +50,10 @@ func BenchmarkImagePix(b *testing.B) {
 
 func TestMergePixelsInLine(t *testing.T) {
 	n := 16
-	test := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{n, n}})
-	test.Set(0, 0, color.RGBA64{0xffff, 0xffff, 0, 0xffff})
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			if (i == 0 && j != 0) || (j == 0 && i != 0) {
-				if i == 0 {
-					test.Set(i, j, color.RGBA64{0xffff, 0, 0, 0xffff})
-				} else if j == 0 {
-					test.Set(i, j, color.RGBA64{0, 0xffff, 0, 0xffff})
-				}
-			} else {
-				test.Set(i, j, color.RGBA64{0, 0, 0, 0xffff})
-			}
-		}
+	test := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{n, 1}})
+	test.Set(0, 0, color.RGBA64{0, 0xffff, 0, 0xffff})
+	for i := 1; i < n; i++ {
+		test.Set(i, 0, color.RGBA64{0xffff, 0, 0, 0xffff})
 	}
 	testFile, err := os.Create("test.png")
 	if err != nil {
@@ -74,20 +64,10 @@ func TestMergePixelsInLine(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	testFile.Close()
-	testTwo := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{n, n}})
+	testTwo := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{n, 1}})
 	testTwo.Set(0, 0, color.RGBA64{0, 0, 0, 0xffff})
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			if (i == 0 && j != 0) || (j == 0 && i != 0) {
-				if i == 0 {
-					testTwo.Set(i, j, color.RGBA64{0, 0xffff, 0, 0xffff})
-				} else if j == 0 {
-					testTwo.Set(i, j, color.RGBA64{0, 0, 0xffff, 0xffff})
-				}
-			} else {
-				testTwo.Set(i, j, color.RGBA64{0, 0, 0, 0xffff})
-			}
-		}
+	for i := 1; i < n; i++ {
+		testTwo.Set(i, 0, color.RGBA64{0, 0, 0xffff, 0xffff})
 	}
 	testFile, err = os.Create("testTwo.png")
 	if err != nil {
@@ -98,7 +78,7 @@ func TestMergePixelsInLine(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	testFile.Close()
-	mergePixelsInLine(true, 0, false, false, 0.8, 3.5, 6.8, 9.2, test, testTwo)
+	mergePixelsInLine(true, 0, true, true, 0.8, 3.5, 2.8, 5.2, test, testTwo)
 	testFile, err = os.Create("testThree.png")
 	if err != nil {
 		t.Fatal(err.Error())
@@ -108,6 +88,22 @@ func TestMergePixelsInLine(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 	testFile.Close()
+}
+
+func TestMergePixelsInHorizontalLine(t *testing.T) {
+	n := 4
+	test := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{n, 1}})
+	test.Set(0, 0, color.RGBA64{0, 0xffff, 0, 0xffff})
+	for i := 1; i < n; i++ {
+		test.Set(i, 0, color.RGBA64{0xffff, 0, 0, 0xffff})
+	}
+	testTwo := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{n, 1}})
+	mergePixelsInLine(true, 0, false, false, 0.5, 1.0, 2.0, 3.0, test, testTwo)
+	r, g, b, a := testTwo.At(2, 0).RGBA()
+	AssertEqualsUint32(t, r, 0)
+	AssertEqualsUint32(t, g, 0xffff)
+	AssertEqualsUint32(t, b, 0)
+	AssertEqualsUint32(t, a, 0xffff)
 }
 
 func TestCreateSameColor(t *testing.T) {

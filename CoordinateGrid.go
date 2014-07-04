@@ -5,34 +5,34 @@ import (
 	"image"
 )
 
-type CoordinateGrid struct {
+type coordinateGrid struct {
 	xGridLines   []*sortedLine
 	yIndexLines  []*sortedLine
 	nXGridLines  int
 	nYIndexLines int
 }
 
-func NewCoordinateGrid() *CoordinateGrid {
-	return &CoordinateGrid{nil, nil, 0, 0}
+func newCoordinateGrid() *coordinateGrid {
+	return &coordinateGrid{nil, nil, 0, 0}
 }
 
-func (c *CoordinateGrid) VerticalGridlineCount() int {
+func (c *coordinateGrid) verticalGridlineCount() int {
 	return c.nXGridLines
 }
 
-func (c *CoordinateGrid) HorizontalGridlineCount() int {
+func (c *coordinateGrid) horizontalGridlineCount() int {
 	return c.nYIndexLines
 }
 
-func (c *CoordinateGrid) verticalGridlineLen() int {
+func (c *coordinateGrid) verticalGridlineLen() int {
 	return len(c.xGridLines)
 }
 
-func (c *CoordinateGrid) horizontalGridlineLen() int {
+func (c *coordinateGrid) horizontalGridlineLen() int {
 	return len(c.yIndexLines)
 }
 
-func (c *CoordinateGrid) AddPoint(horizLine, vertLine int, pt image.Point) {
+func (c *coordinateGrid) addPoint(horizLine, vertLine int, pt image.Point) {
 	for i := len(c.xGridLines); i <= vertLine; i++ {
 		c.xGridLines = append(c.xGridLines, newSortedLine(true))
 	}
@@ -49,7 +49,7 @@ func (c *CoordinateGrid) AddPoint(horizLine, vertLine int, pt image.Point) {
 	c.yIndexLines[horizLine].AddPoint(image.Point{vertLine, index})
 }
 
-func (c *CoordinateGrid) RemovePoint(horizLine, vertLine int) error {
+func (c *coordinateGrid) removePoint(horizLine, vertLine int) error {
 	err := c.checkBounds(horizLine, vertLine)
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func (c *CoordinateGrid) RemovePoint(horizLine, vertLine int) error {
 	return nil
 }
 
-func (c *CoordinateGrid) Point(horizLine, vertLine int) (image.Point, error) {
+func (c *coordinateGrid) point(horizLine, vertLine int) (image.Point, error) {
 	err := c.checkBounds(horizLine, vertLine)
 	if err != nil {
 		return image.ZP, err
@@ -96,7 +96,7 @@ func (c *CoordinateGrid) Point(horizLine, vertLine int) (image.Point, error) {
 	return c.xGridLines[vertLine].Point(yIndexPoint.Y)
 }
 
-func (c *CoordinateGrid) checkBounds(horizLine, vertLine int) error {
+func (c *coordinateGrid) checkBounds(horizLine, vertLine int) error {
 	if horizLine < 0 || horizLine >= c.horizontalGridlineLen() {
 		return errors.New("checkBounds: horizLine is out of bounds.")
 	} else if vertLine < 0 || vertLine >= c.verticalGridlineLen() {

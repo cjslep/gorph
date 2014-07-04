@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"fmt"
 )
 
 type InterpolationFunc func(start, end image.Point, fractionFromStart float64) Float64Point
@@ -34,11 +35,11 @@ func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp I
 		auxDestImage := image.NewRGBA64(destBounds)
 
 		// TODO: Do this somewhere else
-		maxX := intermedGrid.VerticalGridlineCount()
-		maxY := intermedGrid.HorizontalGridlineCount()
+		maxX := intermedGrid.verticalGridlineCount()
+		maxY := intermedGrid.horizontalGridlineCount()
 		for x := 0; x < maxX; x++ {
 			for y := 0; y < maxY; y++ {
-				auxYPt, err := intermedGrid.Point(y, x)
+				auxYPt, err := intermedGrid.point(y, x)
 				if err != nil {
 					return err
 				}
@@ -46,25 +47,25 @@ func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp I
 				if err != nil {
 					return err
 				}
-				auxGridSource.AddPoint(y, x, Float64Point{float64(auxXSourcePt.X), auxYPt.Y})
-				auxGridDest.AddPoint(y, x, Float64Point{float64(auxXDestPt.X), auxYPt.Y})
+				auxGridSource.addPoint(y, x, Float64Point{float64(auxXSourcePt.X), auxYPt.Y})
+				auxGridDest.addPoint(y, x, Float64Point{float64(auxXDestPt.X), auxYPt.Y})
 			}
 		}
 
 		// Calculate Cubic Catmull-Rom spline equations for each vertical line in
 		//   both original (source, dest) and aux (source, dest) images
-		sourceOriginalSplines, destOriginalSplines, nSplinesGrid, err := mGrid.AllCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
+		sourceOriginalSplines, destOriginalSplines, nSplinesGrid, err := mGrid.allCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
 		if err != nil {
 			return err
 		}
-		sourceAuxSplines, nSplinesAuxSource, err := auxGridSource.AllCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
+		sourceAuxSplines, nSplinesAuxSource, err := auxGridSource.allCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
 		if err != nil {
 			return err
 		}
 		if nSplinesGrid != nSplinesAuxSource {
 			return errors.New("Given MorphGrid and source auxilary grid do not have the same number of splines.")
 		}
-		destAuxSplines, nSplinesDestSource, err := auxGridDest.AllCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
+		destAuxSplines, nSplinesDestSource, err := auxGridDest.allCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
 		if err != nil {
 			return err
 		}
@@ -180,47 +181,58 @@ func mergePixelsInLine(horizontally bool, line int, fadeStartPixel, fadeEndPixel
 		lastColoredDestPixel--
 	}
 	for iOrig := pixelOrigSnapStart; iOrig <= pixelOrigSnapEnd; iOrig++ {
+		fmt.Printf("iOrig=%v\n", iOrig)
 		if horizontally {
 			origColor = original.At(iOrig - 1, line)
+			fmt.Printf("(%v, %v) origColor: %v\n", (iOrig - 1), line, origColor)
 		} else {
 			origColor = original.At(line, iOrig - 1)
+			fmt.Printf("(%v, %v) origColor: %v\n", line, (iOrig - 1), origColor)
 		}
 
-		pct := (float64(iOrig) - origStart) / (origEnd - origStart)
+		pct := (math.Min(float64(iOrig), origEnd) - origStart) / (origEnd - origStart)
 		wOrig := 1.0
-		// TODO: Adjust wOrig for first/last in orig
 		if iOrig == pixelOrigSnapStart {
 			wOrig = 1 - (origStart - math.Floor(origStart))
 		} else if iOrig == pixelOrigSnapEnd {
 			wOrig = origEnd - math.Floor(origEnd)
 		}
-		wDest := wOrig / (origEnd - origStart) * (destEnd - destStart)
-		iEndDest := int(math.Floor(pct * (destEnd - destStart) + destStart))
-		iStartDest := int(math.Floor(float64(iEndDest) - wDest))
-		wDestFrac := float64(iEndDest) - wDest - float64(iStartDest)
-		for iDest := iStartDest; iDest <= iEndDest; iDest++ {
-			if iDest == iEndDest && iStartDest != iEndDest {
-				wDestFrac = pct * (destEnd - destStart) + destStart - float64(iEndDest)
+		if wOrig > 0.0 {
+			wDest := wOrig / (origEnd - origStart) * (destEnd - destStart)
+			iEndDest := int(math.Floor(pct * (destEnd - destStart) + destStart))
+			iStartDest := int(math.Floor(pct * (destEnd - destStart) + destStart - wDest))
+			wDestFrac := 1 - (pct * (destEnd - destStart) + destStart - wDest - float64(iStartDest))
+			fmt.Printf("wDest=%v, iEndDest=%v, iStartDest=%v, wDestFrac=%v\n", wDest, iEndDest, iStartDest, wDestFrac)
+			for iDest := iStartDest; iDest <= iEndDest; iDest++ {
+				if iDest == iEndDest && iStartDest != iEndDest {
+					wDestFrac = pct * (destEnd - destStart) + destStart - float64(iEndDest)
+				}
+				if wDestFrac > 0 {
+					if iDest > lastColoredDestPixel && (!fadeEndPixel || (fadeEndPixel && iOrig != pixelOrigSnapEnd)) {
+						if horizontally {
+							dest.Set(iDest, line, weightColor(origColor, wDestFrac))
+							fmt.Printf("(%v, %v) destColor unadded (weight=%v): %v\n", iDest, line, wDestFrac, weightColor(origColor, wDestFrac))
+						} else {
+							dest.Set(line, iDest, weightColor(origColor, wDestFrac))
+							fmt.Printf("(%v, %v) destColor unadded (weight=%v): %v\n", line, iDest, wDestFrac, weightColor(origColor, wDestFrac))
+						}
+						lastColoredDestPixel = iDest
+					} else {
+						pastColor := dest.At(iDest, line)
+						if iDest > lastColoredDestPixel && fadeEndPixel && iOrig == pixelOrigSnapEnd {
+							lastColoredDestPixel = iDest
+						}
+						if horizontally {
+							dest.Set(iDest, line, addColors(pastColor, weightColor(origColor, wDestFrac)))
+							fmt.Printf("(%v, %v) destColor added (weight=%v): %v\n", iDest, line, wDestFrac, addColors(pastColor, weightColor(origColor, wDestFrac)))
+						} else {
+							dest.Set(line, iDest, addColors(pastColor, weightColor(origColor, wDestFrac)))
+							fmt.Printf("(%v, %v) destColor added (weight=%v): %v\n", line, iDest, wDestFrac, addColors(pastColor, weightColor(origColor, wDestFrac)))
+						}
+					}
+				}
+				wDestFrac = 1
 			}
-			if iDest > lastColoredDestPixel && (!fadeEndPixel || (fadeEndPixel && iDest != iEndDest)) {
-				if horizontally {
-					dest.Set(iDest, line, weightColor(origColor, wDestFrac))
-				} else {
-					dest.Set(line, iDest, weightColor(origColor, wDestFrac))
-				}
-				lastColoredDestPixel = iDest
-			} else {
-				pastColor := dest.At(iDest, line)
-				if iDest > lastColoredDestPixel && fadeEndPixel && iDest == iEndDest {
-					lastColoredDestPixel = iDest
-				}
-				if horizontally {
-					dest.Set(iDest, line, addColors(pastColor, weightColor(origColor, wDestFrac)))
-				} else {
-					dest.Set(line, iDest, addColors(pastColor, weightColor(origColor, wDestFrac)))
-				}
-			}
-			wDestFrac = 1
 		}
 	}
 }

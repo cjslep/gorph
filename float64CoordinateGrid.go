@@ -16,11 +16,11 @@ func newFloat64CoordinateGrid() *float64CoordinateGrid {
 	return &float64CoordinateGrid{nil, nil, 0, 0}
 }
 
-func (f *float64CoordinateGrid) VerticalGridlineCount() int {
+func (f *float64CoordinateGrid) verticalGridlineCount() int {
 	return f.nXGridLines
 }
 
-func (f *float64CoordinateGrid) HorizontalGridlineCount() int {
+func (f *float64CoordinateGrid) horizontalGridlineCount() int {
 	return f.nYIndexLines
 }
 
@@ -32,7 +32,7 @@ func (f *float64CoordinateGrid) horizontalGridlineLen() int {
 	return len(f.yIndexLines)
 }
 
-func (f *float64CoordinateGrid) AddPoint(horizLine, vertLine int, pt Float64Point) {
+func (f *float64CoordinateGrid) addPoint(horizLine, vertLine int, pt Float64Point) {
 	for i := len(f.xGridLines); i <= vertLine; i++ {
 		f.xGridLines = append(f.xGridLines, newSortedFloat64Line(true))
 	}
@@ -49,7 +49,7 @@ func (f *float64CoordinateGrid) AddPoint(horizLine, vertLine int, pt Float64Poin
 	f.yIndexLines[horizLine].AddPoint(image.Point{vertLine, index})
 }
 
-func (f *float64CoordinateGrid) RemovePoint(horizLine, vertLine int) error {
+func (f *float64CoordinateGrid) removePoint(horizLine, vertLine int) error {
 	err := f.checkBounds(horizLine, vertLine)
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func (f *float64CoordinateGrid) RemovePoint(horizLine, vertLine int) error {
 	return nil
 }
 
-func (f *float64CoordinateGrid) Point(horizLine, vertLine int) (Float64Point, error) {
+func (f *float64CoordinateGrid) point(horizLine, vertLine int) (Float64Point, error) {
 	err := f.checkBounds(horizLine, vertLine)
 	if err != nil {
 		return Float64Point{0, 0}, err
@@ -105,10 +105,10 @@ func (f *float64CoordinateGrid) checkBounds(horizLine, vertLine int) error {
 	return nil
 }
 
-func (f *float64CoordinateGrid) HorizontalLine(index int) (source []Float64Point) {
+func (f *float64CoordinateGrid) horizontalLine(index int) (source []Float64Point) {
 	source = make([]Float64Point, 0, f.verticalGridlineLen())
 	for vLine := 0; vLine < f.verticalGridlineLen(); vLine++ {
-		temp, err := f.Point(index, vLine)
+		temp, err := f.point(index, vLine)
 		if err == nil {
 			source = append(source, temp)
 		}
@@ -116,10 +116,10 @@ func (f *float64CoordinateGrid) HorizontalLine(index int) (source []Float64Point
 	return
 }
 
-func (f *float64CoordinateGrid) VerticalLine(index int) (source []Float64Point) {
+func (f *float64CoordinateGrid) verticalLine(index int) (source []Float64Point) {
 	source = make([]Float64Point, 0, f.horizontalGridlineLen())
 	for hLine := 0; hLine < f.horizontalGridlineLen(); hLine++ {
-		temp, err := f.Point(hLine, index)
+		temp, err := f.point(hLine, index)
 		if err == nil {
 			source = append(source, temp)
 		}
@@ -127,7 +127,7 @@ func (f *float64CoordinateGrid) VerticalLine(index int) (source []Float64Point) 
 	return
 }
 
-func (f *float64CoordinateGrid) AllCubicCatmullRomSplines(vertical bool, alpha float64, totSteps int) (splines []*sortedFloat64Line, nSplines int, err error) {
+func (f *float64CoordinateGrid) allCubicCatmullRomSplines(vertical bool, alpha float64, totSteps int) (splines []*sortedFloat64Line, nSplines int, err error) {
 	splines = nil
 	nSplines = 0
 	err = nil
@@ -138,9 +138,9 @@ func (f *float64CoordinateGrid) AllCubicCatmullRomSplines(vertical bool, alpha f
 	for i := 0; i < nLoops; i++ {
 		var sourcePts []Float64Point = nil
 		if vertical {
-			sourcePts = f.VerticalLine(i)
+			sourcePts = f.verticalLine(i)
 		} else {
-			sourcePts = f.HorizontalLine(i)
+			sourcePts = f.horizontalLine(i)
 		}
 		if len(sourcePts) > 2 {
 			sourceLine, err := CubicCatmullRomInterpolation(sourcePts, alpha, totSteps)
