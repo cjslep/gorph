@@ -2,20 +2,26 @@ package gorph
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"fmt"
 )
 
+// InterpolationFunc interpolates a Float64Point between two image points based on a
+// ratio distance from the starting point to the ending point, such that fractionFromStart
+// lies on the interval [0.0, 1.0]. The value 0.0 maps to the starting point, and 1.0 to
+// the end point.
 type InterpolationFunc func(start, end image.Point, fractionFromStart float64) Float64Point
 
-//
+// Morph performes a keyframe-based morphing of two images in order to interpolate a new set
+// of transition images. It is based on the coordinate grid approach to morphing an image, as
+// opposed to a feature line.
 // numMorphs - the number of morph images to create
 // start - starting image
-// dest - resulting image
-// mGrid - two grids with start/end points
-// timeInterp - function to use to interpolate time-wise
+// dest - ending image
+// mGrid - a MorphGrid representing homogulous points on both images
+// timeInterp - function to use to interpolate cross-fading images over time
 //
 func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp InterpolationFunc) error {
 	startBounds := start.Bounds()
@@ -183,10 +189,10 @@ func mergePixelsInLine(horizontally bool, line int, fadeStartPixel, fadeEndPixel
 	for iOrig := pixelOrigSnapStart; iOrig <= pixelOrigSnapEnd; iOrig++ {
 		fmt.Printf("iOrig=%v\n", iOrig)
 		if horizontally {
-			origColor = original.At(iOrig - 1, line)
+			origColor = original.At(iOrig-1, line)
 			fmt.Printf("(%v, %v) origColor: %v\n", (iOrig - 1), line, origColor)
 		} else {
-			origColor = original.At(line, iOrig - 1)
+			origColor = original.At(line, iOrig-1)
 			fmt.Printf("(%v, %v) origColor: %v\n", line, (iOrig - 1), origColor)
 		}
 
@@ -199,13 +205,13 @@ func mergePixelsInLine(horizontally bool, line int, fadeStartPixel, fadeEndPixel
 		}
 		if wOrig > 0.0 {
 			wDest := wOrig / (origEnd - origStart) * (destEnd - destStart)
-			iEndDest := int(math.Floor(pct * (destEnd - destStart) + destStart))
-			iStartDest := int(math.Floor(pct * (destEnd - destStart) + destStart - wDest))
-			wDestFrac := 1 - (pct * (destEnd - destStart) + destStart - wDest - float64(iStartDest))
+			iEndDest := int(math.Floor(pct*(destEnd-destStart) + destStart))
+			iStartDest := int(math.Floor(pct*(destEnd-destStart) + destStart - wDest))
+			wDestFrac := 1 - (pct*(destEnd-destStart) + destStart - wDest - float64(iStartDest))
 			fmt.Printf("wDest=%v, iEndDest=%v, iStartDest=%v, wDestFrac=%v\n", wDest, iEndDest, iStartDest, wDestFrac)
 			for iDest := iStartDest; iDest <= iEndDest; iDest++ {
 				if iDest == iEndDest && iStartDest != iEndDest {
-					wDestFrac = pct * (destEnd - destStart) + destStart - float64(iEndDest)
+					wDestFrac = pct*(destEnd-destStart) + destStart - float64(iEndDest)
 				}
 				if wDestFrac > 0 {
 					if iDest > lastColoredDestPixel && (!fadeEndPixel || (fadeEndPixel && iOrig != pixelOrigSnapEnd)) {
@@ -267,7 +273,7 @@ func interpolateColors(colorWeighted, colorOther color.Color, weight float64) co
 }
 
 func multiplyCeilingOverflow(value uint32, weight float64) uint16 {
-	ret := uint16(float64(value) * weight + 0.5)
+	ret := uint16(float64(value)*weight + 0.5)
 	if math.Floor(weight) != 0.0 && uint32(float64(ret)/math.Floor(weight)) != value {
 		ret = 1<<16 - 1 // Overflow, return largest number possible
 	}

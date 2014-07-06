@@ -6,12 +6,19 @@ import (
 	"math"
 )
 
+// LinearInterpolation linearly interpolates the Float64Point between two image points.
 func LinearInterpolation(start, end image.Point, fractionFromStart float64) Float64Point {
 	interpX := float64(start.X)*(1-fractionFromStart) + float64(end.X)*fractionFromStart
 	interpY := float64(start.Y)*(1-fractionFromStart) + float64(end.Y)*fractionFromStart
 	return Float64Point{interpX, interpY}
 }
 
+// CubicCatmullRomInterpolationImagePoints computes the Catmull-Rom spline from a given set
+// of image points. There must be at least three points passed in, the alpha value must
+// be in the range of [0.0, 1.0] and the total steps must be 2 or greater. The
+// alpha parameter dictates the kind of Catmull-Rom spline generated; a value of
+// 0 yields a Uniform curve, a value of 0.5 yields a Centripetal curve (which will
+// not form loops), and a value of 1.0 creates a Chordal curve.
 func CubicCatmullRomInterpolationImagePoints(points []image.Point, alpha float64, totSteps int) ([]Float64Point, error) {
 	floatPoints := make([]Float64Point, len(points))
 	for i := 0; i < len(floatPoints); i++ {
@@ -20,6 +27,12 @@ func CubicCatmullRomInterpolationImagePoints(points []image.Point, alpha float64
 	return CubicCatmullRomInterpolation(floatPoints, alpha, totSteps)
 }
 
+// CubicCatmullRomInterpolation computes the Catmull-Rom spline from a given set
+// of points. There must be at least three points passed in, the alpha value must
+// be in the range of [0.0, 1.0] and the total steps must be 2 or greater. The
+// alpha parameter dictates the kind of Catmull-Rom spline generated; a value of
+// 0 yields a Uniform curve, a value of 0.5 yields a Centripetal curve (which will
+// not form loops), and a value of 1.0 creates a Chordal curve.
 func CubicCatmullRomInterpolation(points []Float64Point, alpha float64, totSteps int) ([]Float64Point, error) {
 	nPoints := len(points)
 	if nPoints < 3 {
@@ -84,10 +97,12 @@ func CubicCatmullRomInterpolation(points []Float64Point, alpha float64, totSteps
 	return resultPts, nil
 }
 
+// Distance computes the distance between two floating-point points.
 func Distance(p1, p2 Float64Point) float64 {
 	return math.Pow(math.Pow(p1.X-p2.X, 2.0)+math.Pow(p1.Y-p2.Y, 2.0), 0.5)
 }
 
+// DistanceImagePoint computes the distance between two integer points.
 func DistanceImagePoint(p1, p2 image.Point) float64 {
 	return math.Pow(float64(p1.X*p1.X+p2.Y*p2.Y), 0.5)
 }

@@ -3,9 +3,9 @@ package gorph
 import (
 	"image"
 	"image/color"
-	"testing"
-	"os"
 	"image/png"
+	"os"
+	"testing"
 )
 
 func AssertEqualsUint32(t *testing.T, val1, val2 uint32, message ...string) {
@@ -137,7 +137,7 @@ func TestWeightColorOne(t *testing.T) {
 
 func TestWeightColorOverflow(t *testing.T) {
 	colorOne := color.RGBA64{0, 0x1000, 0x2000, 0x1000}
-	result := weightColor(colorOne, 1 << 4)
+	result := weightColor(colorOne, 1<<4)
 	r, g, b, a := result.RGBA()
 	AssertEqualsUint32(t, r, 0)
 	AssertEqualsUint32(t, g, 1<<16-1)

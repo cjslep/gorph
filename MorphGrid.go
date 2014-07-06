@@ -30,7 +30,7 @@ func (m *MorphGrid) AddPoints(horizLine, vertLine int, startPt, destPt image.Poi
 
 // RemovePoints removes the homogulous points that belong to the specified
 // horizontal and vertical line. Returns an error if the operation is not
-// able to complete.
+// able to complete successfully.
 func (m *MorphGrid) RemovePoints(horizLine, vertLine int) error {
 	err := m.start.removePoint(horizLine, vertLine)
 	if err != nil {
@@ -64,7 +64,8 @@ func (m *MorphGrid) Points(horizLine, vertLine int) (image.Point, image.Point, e
 }
 
 // HorizontalLine takes an index of a horizontal line and returns all points
-// associated with the line in both grids.
+// associated with the line in both grids. The points are sorted in increasing
+// x-values.
 func (m *MorphGrid) HorizontalLine(index int) (source, dest []image.Point) {
 	source = make([]image.Point, 0, m.start.verticalGridlineLen())
 	dest = make([]image.Point, 0, m.start.verticalGridlineLen())
@@ -82,7 +83,8 @@ func (m *MorphGrid) HorizontalLine(index int) (source, dest []image.Point) {
 }
 
 // VerticalLine takes an index of a vertical line and returns all points
-// associated with the line in both grids.
+// associated with the line in both grids. The points are sorted in increasing
+// y-values.
 func (m *MorphGrid) VerticalLine(index int) (source, dest []image.Point) {
 	source = make([]image.Point, 0, m.start.horizontalGridlineLen())
 	dest = make([]image.Point, 0, m.start.horizontalGridlineLen())
