@@ -6,10 +6,17 @@ import (
 	"math"
 )
 
-// LinearInterpolation linearly interpolates the Float64Point between two image points.
-func LinearInterpolation(start, end image.Point, fractionFromStart float64) Float64Point {
-	interpX := float64(start.X)*(1-fractionFromStart) + float64(end.X)*fractionFromStart
-	interpY := float64(start.Y)*(1-fractionFromStart) + float64(end.Y)*fractionFromStart
+// LinearInterpolationImagePoints linearly interpolates the Float64Point between two image points based
+// on the ratio of the distance from the start point over the total distance.
+func LinearInterpolationImagePoints(start, end image.Point, fractionFromStart float64) Float64Point {
+	return LinearInterpolation(ToFloat64Point(start), ToFloat64Point(end), fractionFromStart)
+}
+
+// LinearInterpolation linearly interpolates the Float64Point between two Float64Points based
+// on the ratio of the distance from the start point over the total distance.
+func LinearInterpolation(start, end Float64Point, fractionFromStart float64) Float64Point {
+	interpX := start.X*(1-fractionFromStart) + end.X*fractionFromStart
+	interpY := start.Y*(1-fractionFromStart) + end.Y*fractionFromStart
 	return Float64Point{interpX, interpY}
 }
 
@@ -22,27 +29,37 @@ func LinearInterpolation(start, end image.Point, fractionFromStart float64) Floa
 func CubicCatmullRomInterpolationImagePoints(points []image.Point, alpha float64, totSteps int) ([]Float64Point, error) {
 	floatPoints := make([]Float64Point, len(points))
 	for i := 0; i < len(floatPoints); i++ {
-		floatPoints[i] = Float64Point{float64(points[i].X), float64(points[i].Y)}
+		floatPoints[i] = ToFloat64Point(points[i])
 	}
 	return CubicCatmullRomInterpolation(floatPoints, alpha, totSteps)
 }
 
 // CubicCatmullRomInterpolation computes the Catmull-Rom spline from a given set
 // of points. There must be at least three points passed in, the alpha value must
-// be in the range of [0.0, 1.0] and the total steps must be 2 or greater. The
+// be in the range of [0.0, 1.0] and the total steps must be 2 or greater. If two
+// points are passed in, linear interpolation occurs instead. The
 // alpha parameter dictates the kind of Catmull-Rom spline generated; a value of
 // 0 yields a Uniform curve, a value of 0.5 yields a Centripetal curve (which will
 // not form loops), and a value of 1.0 creates a Chordal curve.
 func CubicCatmullRomInterpolation(points []Float64Point, alpha float64, totSteps int) ([]Float64Point, error) {
 	nPoints := len(points)
-	if nPoints < 3 {
-		return nil, errors.New("CubicCatmullRomInterpolation: Two or less points passed in")
+	if nPoints < 2 {
+		return nil, errors.New("CubicCatmullRomInterpolation: Less than two points passed in")
 	}
 	if alpha < 0 || alpha > 1 {
 		return nil, errors.New("CubicCatmullRomInterpolation: Alpha must be in the range of [0.0, 1.0]")
 	}
 	if totSteps < 2 {
 		return nil, errors.New("CubicCatmullRomInterpolation: Total steps must be 2 or greater")
+	}
+	resultPts := make([]Float64Point, 0, totSteps)
+	if nPoints == 2 {
+		resultPts[0] = points[0]
+		for i := 1; i < totSteps - 1; i++ {
+			resultPts[i] = LinearInterpolation(points[0], points[1], float64(i) / float64(totSteps))
+		}
+		resultPts[totSteps - 1] = points[1]
+		return resultPts, nil
 	}
 	// Precompute the number of "steps" to take between each point
 	stepsAtRange := make([]uint, nPoints-1)
@@ -51,7 +68,7 @@ func CubicCatmullRomInterpolation(points []Float64Point, alpha float64, totSteps
 		sumDist += Distance(points[i], points[i+1])
 	}
 	for i := 0; i < nPoints-1; i++ {
-		stepsAtRange[i] = uint(math.Floor(float64(totSteps)*Distance(points[i], points[i+1])/sumDist + 0.5))
+		stepsAtRange[i] = uint(math.Floor((float64(totSteps)-0.5)*Distance(points[i], points[i+1])/sumDist + 0.5))
 	}
 
 	// Linearly extrapolate
@@ -65,7 +82,6 @@ func CubicCatmullRomInterpolation(points []Float64Point, alpha float64, totSteps
 	tEnd := tStart + math.Pow(Distance(pt1, pt2), alpha)
 	tNext := tEnd + math.Pow(Distance(pt2, pt3), alpha)
 
-	resultPts := make([]Float64Point, 0, totSteps)
 	for i := 0; i < nPoints-1; i++ {
 		var j uint = 0
 		for ; j < stepsAtRange[i]; j++ {
@@ -94,6 +110,7 @@ func CubicCatmullRomInterpolation(points []Float64Point, alpha float64, totSteps
 		tEnd = tNext
 		tNext = tNext + math.Pow(Distance(pt2, pt3), alpha)
 	}
+	resultPts = append(resultPts, points[len(points)-1])
 	return resultPts, nil
 }
 
