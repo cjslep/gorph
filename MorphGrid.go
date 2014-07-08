@@ -102,7 +102,7 @@ func (m *MorphGrid) VerticalLine(index int) (source, dest []image.Point) {
 }
 
 // allCubicCatmullRomSplines
-func (m *MorphGrid) allCubicCatmullRomSplines(vertical bool, alpha float64, totSteps int) (source, dest []*sortedFloat64Line, nSplines int, err error) {
+func (m *MorphGrid) allCubicCatmullRomSplines(vertical bool, alpha float64, totSteps int) (source, dest []*parametricLineFloat64, nSplines int, err error) {
 	source = nil
 	dest = nil
 	nSplines = 0
@@ -128,8 +128,8 @@ func (m *MorphGrid) allCubicCatmullRomSplines(vertical bool, alpha float64, totS
 			if err != nil {
 				return nil, nil, 0, err
 			}
-			source = append(source, newSortedFloat64Line(!vertical))
-			dest = append(dest, newSortedFloat64Line(!vertical))
+			source = append(source, newParametricLineFloat64())
+			dest = append(dest, newParametricLineFloat64())
 			source[len(source)-1].AddPoints(sourceLine)
 			dest[len(dest)-1].AddPoints(destLine)
 			nSplines++

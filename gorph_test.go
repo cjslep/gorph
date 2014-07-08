@@ -106,6 +106,52 @@ func TestMergePixelsInHorizontalLine(t *testing.T) {
 	AssertEqualsUint32(t, a, 0xffff)
 }
 
+func TestStretchHorizontally(t *testing.T) {
+	width := 4
+	height := 4
+	test := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
+	test.Set(0, 0, color.RGBA64{0, 0xffff, 0, 0xffff})
+	for i := 0; i < width; i++ {
+		for j := 0; j < height; j++ {
+			test.Set(i, j, color.RGBA64{0xffff * uint16(i), 0xffff * uint16(height - j - 1), 0, 0xffff})	
+		}
+	}
+	testFile, err := os.Create("PreStretch.png")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	err = png.Encode(testFile, test)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	testFile.Close()
+	testTwo := image.NewRGBA64(image.Rectangle{image.Point{0, 0}, image.Point{width, height}})
+	mGrid := NewMorphGrid()
+	mGrid.AddPoints(0, 0, image.Point{0, 0}, image.Point{0, 0})
+	mGrid.AddPoints(0, 2, image.Point{width, 0}, image.Point{width, 0})
+	mGrid.AddPoints(2, 0, image.Point{0, height}, image.Point{0, height})
+	mGrid.AddPoints(2, 2, image.Point{width, height}, image.Point{width, height})
+	mGrid.AddPoints(1, 0, image.Point{0, 2}, image.Point{0, 2})
+	mGrid.AddPoints(1, 1, image.Point{3, 2}, image.Point{3, 2})
+	mGrid.AddPoints(1, 2, image.Point{width, 2}, image.Point{width, 2})
+	mGrid.AddPoints(0, 1, image.Point{3, 0}, image.Point{3, 0})
+	mGrid.AddPoints(2, 1, image.Point{3, height}, image.Point{3, height})
+	start, end, nSplines, err := mGrid.allCubicCatmullRomSplines(true, 0.5, 5)
+	AssertEqualsInt(t, nSplines, 3)
+	err = stretchPixelsHorizontally(0, 2, start, end, test, testTwo)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	testFile, err = os.Create("PostStretch.png")
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+	err = png.Encode(testFile, test)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+}
+
 func TestCreateSameColor(t *testing.T) {
 	colorOne := color.RGBA64{0, 0x1000, 0x2000, 0x1000}
 	r, g, b, a := colorOne.RGBA()

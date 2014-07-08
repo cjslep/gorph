@@ -157,12 +157,36 @@ func TestMorphGridRemovePointsVertical(t *testing.T) {
 	AssertEqualsInt(t, len(dest), 1, "After removal dest length incorrect")
 }
 
+func TestMorphGridSquare(t *testing.T) {
+	width := 4
+	height := 4
+	mGrid := NewMorphGrid()
+	mGrid.AddPoints(0, 0, image.Point{0, 0}, image.Point{0, 0})
+	mGrid.AddPoints(0, 2, image.Point{width, 0}, image.Point{width, 0})
+	mGrid.AddPoints(2, 0, image.Point{0, height}, image.Point{0, height})
+	mGrid.AddPoints(2, 2, image.Point{width, height}, image.Point{width, height})
+	mGrid.AddPoints(1, 0, image.Point{0, 2}, image.Point{0, 2})
+	mGrid.AddPoints(1, 1, image.Point{2, 2}, image.Point{3, 2})
+	mGrid.AddPoints(1, 2, image.Point{width, 2}, image.Point{width, 2})
+	mGrid.AddPoints(0, 1, image.Point{2, 0}, image.Point{3, 0})
+	mGrid.AddPoints(2, 1, image.Point{2, height}, image.Point{3, height})
+	source, dest := mGrid.VerticalLine(1)
+	AssertEqualsInt(t, len(source), 3)
+	AssertEqualsInt(t, source[0].X, 2, "source[0].X failed")
+	AssertEqualsInt(t, source[0].Y, 0, "source[0].Y failed")
+	AssertEqualsInt(t, source[1].X, 2, "source[1].X failed")
+	AssertEqualsInt(t, source[1].Y, 2, "source[1].Y failed")
+	AssertEqualsInt(t, source[2].X, 2, "source[2].X failed")
+	AssertEqualsInt(t, source[2].Y, height, "source[2].Y failed")
+	AssertEqualsInt(t, len(dest), 3)
+}
+
 func TestMorphGridInterpolatedGrid(t *testing.T) {
 	m := NewMorphGrid()
 	m.AddPoints(3, 2, image.Point{1, 2}, image.Point{3, 4})
 	m.AddPoints(3, 4, image.Point{2, 2}, image.Point{4, 6})
 	m.AddPoints(4, 4, image.Point{5, 7}, image.Point{6, 10})
-	g := m.interpolatedGrid(LinearInterpolation, 0.5)
+	g := m.interpolatedGrid(LinearInterpolationImagePoints, 0.5)
 	AssertEqualsInt(t, g.verticalGridlineCount(), m.VerticalGridlineCount(), "Interpolated/Morph grid mismatch")
 	AssertEqualsInt(t, g.horizontalGridlineCount(), m.HorizontalGridlineCount(), "Interpolated/Morph grid mismatch")
 	p1, err := g.point(3, 2)
@@ -183,7 +207,7 @@ func TestMorphGridInterpolatedGrid(t *testing.T) {
 	AssertEqualsFloat64PointTolerance(t, p1, Float64Point{2.0, 3.0}, 0.000001, "Interpolation point incorrect")
 	AssertEqualsFloat64PointTolerance(t, p2, Float64Point{3.0, 4.0}, 0.000001, "Interpolation point incorrect")
 	AssertEqualsFloat64PointTolerance(t, p3, Float64Point{5.5, 8.5}, 0.000001, "Interpolation point incorrect")
-	g = m.interpolatedGrid(LinearInterpolation, 0.25)
+	g = m.interpolatedGrid(LinearInterpolationImagePoints, 0.25)
 	AssertEqualsInt(t, g.verticalGridlineCount(), m.VerticalGridlineCount(), "Interpolated/Morph grid mismatch")
 	AssertEqualsInt(t, g.horizontalGridlineCount(), m.HorizontalGridlineCount(), "Interpolated/Morph grid mismatch")
 	p1, err = g.point(3, 2)

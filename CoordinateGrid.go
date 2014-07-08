@@ -42,11 +42,18 @@ func (c *coordinateGrid) addPoint(horizLine, vertLine int, pt image.Point) {
 	if !c.xGridLines[vertLine].HasPoints() {
 		c.nXGridLines++
 	}
-	index := c.xGridLines[vertLine].AddPoint(pt)
+	indexAdded := c.xGridLines[vertLine].AddPoint(pt)
+	for i := 0; i < c.horizontalGridlineLen(); i++ {
+		if pt, index, err := c.yIndexLines[i].PointWithXValue(vertLine); pt.Y >= indexAdded && err == nil{
+			_ = c.yIndexLines[i].RemovePoint(index)
+			pt.Y = pt.Y + 1
+			c.yIndexLines[i].AddPoint(pt)
+		}
+	}
 	if !c.yIndexLines[horizLine].HasPoints() {
 		c.nYIndexLines++
 	}
-	c.yIndexLines[horizLine].AddPoint(image.Point{vertLine, index})
+	c.yIndexLines[horizLine].AddPoint(image.Point{vertLine, indexAdded})
 }
 
 func (c *coordinateGrid) removePoint(horizLine, vertLine int) error {
@@ -54,7 +61,7 @@ func (c *coordinateGrid) removePoint(horizLine, vertLine int) error {
 	if err != nil {
 		return err
 	}
-	yIndexPoint, err := c.yIndexLines[horizLine].PointWithXValue(vertLine)
+	yIndexPoint, _, err := c.yIndexLines[horizLine].PointWithXValue(vertLine)
 	if err != nil {
 		return err
 	}
@@ -73,7 +80,7 @@ func (c *coordinateGrid) removePoint(horizLine, vertLine int) error {
 		c.nYIndexLines--
 	}
 	for i := 0; i < len(c.yIndexLines); i++ {
-		pt, err := c.yIndexLines[i].PointWithXValue(vertLine)
+		pt, _, err := c.yIndexLines[i].PointWithXValue(vertLine)
 		if err == nil && pt.Y > yIndexPoint.Y {
 			err := c.yIndexLines[i].RemovePointWithXValue(vertLine)
 			if err == nil {
@@ -89,11 +96,12 @@ func (c *coordinateGrid) point(horizLine, vertLine int) (image.Point, error) {
 	if err != nil {
 		return image.ZP, err
 	}
-	yIndexPoint, err := c.yIndexLines[horizLine].PointWithXValue(vertLine)
+	yIndexPoint, _, err := c.yIndexLines[horizLine].PointWithXValue(vertLine)
 	if err != nil {
 		return image.ZP, err
 	}
-	return c.xGridLines[vertLine].Point(yIndexPoint.Y)
+	temp, err := c.xGridLines[vertLine].Point(yIndexPoint.Y)
+	return temp, err
 }
 
 func (c *coordinateGrid) checkBounds(horizLine, vertLine int) error {

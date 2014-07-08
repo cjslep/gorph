@@ -22,9 +22,9 @@ func (s *sortedLine) Len() int {
 
 func (s *sortedLine) Less(i, j int) bool {
 	if s.sortOnX {
-		return s.sortedPoints[i].X < s.sortedPoints[j].X
+		return s.sortedPoints[i].X < s.sortedPoints[j].X || (s.sortedPoints[i].X == s.sortedPoints[j].X && s.sortedPoints[i].Y < s.sortedPoints[j].Y)
 	} else {
-		return s.sortedPoints[i].Y < s.sortedPoints[j].Y
+		return s.sortedPoints[i].Y < s.sortedPoints[j].Y || (s.sortedPoints[i].Y == s.sortedPoints[j].Y && s.sortedPoints[i].X < s.sortedPoints[j].X)
 	}
 }
 
@@ -38,7 +38,11 @@ func (s *sortedLine) AddPoint(pt image.Point) int {
 	s.sortedPoints = append(s.sortedPoints, pt)
 	sort.Sort(s)
 	return sort.Search(len(s.sortedPoints), func(i int) bool {
-		return s.sortedPoints[i].X >= pt.X || s.sortedPoints[i].Y >= pt.Y
+		if s.sortOnX {
+			return s.sortedPoints[i].X > pt.X || (s.sortedPoints[i].X == pt.X && s.sortedPoints[i].Y >= pt.Y)
+		} else {
+			return s.sortedPoints[i].Y > pt.Y || (s.sortedPoints[i].Y == pt.Y && s.sortedPoints[i].X >= pt.X)
+		}
 	})
 }
 
@@ -48,14 +52,14 @@ func (s *sortedLine) AddPoints(pts []image.Point) {
 	}
 }
 
-func (s *sortedLine) PointWithXValue(xValue int) (image.Point, error) {
+func (s *sortedLine) PointWithXValue(xValue int) (image.Point, int, error) {
 	index := sort.Search(len(s.sortedPoints), func(i int) bool {
 		return s.sortedPoints[i].X >= xValue
 	})
 	if index == len(s.sortedPoints) || s.sortedPoints[index].X != xValue {
-		return image.ZP, errors.New("PointWithXValue: No point with value = " + strconv.Itoa(xValue))
+		return image.ZP, -1, errors.New("PointWithXValue: No point with value = " + strconv.Itoa(xValue))
 	}
-	return s.sortedPoints[index], nil
+	return s.sortedPoints[index], index, nil
 }
 
 func (s *sortedLine) RemovePoint(index int) error {
@@ -83,7 +87,7 @@ func (s *sortedLine) RemovePointWithXValue(xValue int) error {
 
 func (s *sortedLine) Point(index int) (image.Point, error) {
 	if index < 0 || index >= s.Len() {
-		return image.ZP, errors.New("Point: index to remove is out of bounds.")
+		return image.ZP, errors.New("Point: index is out of bounds: " + strconv.Itoa(index))
 	}
 	return s.sortedPoints[index], nil
 }

@@ -100,79 +100,68 @@ func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp I
 	return nil
 }
 
-func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*sortedFloat64Line, start image.Image, aux *image.RGBA64) error {
-	nSplinesGrid := len(originalSplines)
+func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*parametricLineFloat64, start image.Image, final *image.RGBA64) error {
+	nSplines := len(originalSplines)
+	if nSplines != len(auxSplines) {
+		return errors.New("stretchPixelsHorizontally: Spline count does not match between start and final images")
+	}
+	fmt.Printf("originalSplines: %v\n", originalSplines[0])
+	fmt.Printf("auxSplines: %v\n", auxSplines[0])
 	for y := yStart; y < yEnd; y++ {
-		// For each line:
-		//  Get intercept of spline for original (source, dest) and aux (source, dest) image
-		//  Map pixels from original (source, dest) to aux (source, dest) image, using
-		//    fractional weights as necessary for antialiasing
-		originalStart, err := originalSplines[0].ClosestPointToSortedValue(float64(y))
-		if err != nil {
-			return err
-		}
-		auxStart, err := auxSplines[0].ClosestPointToSortedValue(float64(y))
-		if err != nil {
-			return err
-		}
-		for splineIndex := 1; splineIndex < nSplinesGrid; splineIndex++ {
-			originalEnd, err := originalSplines[splineIndex].ClosestPointToSortedValue(float64(y))
+		for iSpline := 0; iSpline < nSplines - 1; iSpline++ {
+			fmt.Printf("y=%v, iSpline=%v\n", y, iSpline)
+			origStart, err := originalSplines[iSpline].InterpolatePointsAtY(float64(y))
 			if err != nil {
 				return err
 			}
-			auxEnd, err := auxSplines[splineIndex].ClosestPointToSortedValue(float64(y))
+			origEnd, err := originalSplines[iSpline + 1].InterpolatePointsAtY(float64(y))
 			if err != nil {
 				return err
 			}
-			deltaSourceOriginal := originalEnd.X - originalStart.X
-			deltaSourceAux := auxEnd.X - auxStart.X
-			normSourceDist := deltaSourceOriginal / deltaSourceAux
-			if normSourceDist < 1 { // Expanding smaller pixels into larger
-				normSourceDist = deltaSourceAux / deltaSourceOriginal
-				auxPivot := auxStart.X
-				for auxX := auxPivot; auxX < auxPivot+normSourceDist; auxX += 1 {
-					for x := originalStart.X; x <= originalEnd.X; x += 1 {
-						colorRes := start.At(int(math.Floor(x)), y)
-						if (auxX == auxPivot && splineIndex != 1) || (auxX+1 >= auxPivot+normSourceDist && splineIndex+1 != nSplinesGrid) {
-							prev := aux.At(int(math.Floor(auxX)), y)
-							ratioThis := auxX - math.Floor(auxX)
-							colorRes = interpolateColors(colorRes, prev, ratioThis)
-							aux.Set(int(math.Floor(auxX)), y, colorRes)
-						} else {
-							aux.Set(int(math.Floor(auxX)), y, colorRes)
-						}
-					}
-					auxPivot += normSourceDist
-				}
-			} else { // Expanding larger pixels into smaller
-				// TODO: handle end pixels that need full color, border pixels
-				sourcePivot := originalStart.X
-				for x := auxStart.X; x <= auxEnd.X; x += 1 {
-					/*for sourceX := sourcePivot; sourceX < sourcePivot + normSourceDist; sourceX += 1 {
-						colorRes := start.At(int(math.Floor(sourcePivot)), y)
-						if (sourceX == sourcePivot && splineIndex != 1) || (sourceX + 1 >= sourcePivot + normSourceDist && splineIndex + 1 != nSplinesGrid) {
-							prev := aux.At(int(math.Floor(auxX)), y)
-							ratioThis := auxX - math.Floor(auxX)
-							colorRes = interpolateColors(colorRes, prev, ratioThis)
-							aux.Set(int(math.Floor(auxX)), y, colorRes)
-						} else {
-							aux.Set(int(math.Floor(auxX)), y, colorRes)
-						}
-					}*/
+			destStart, err := auxSplines[iSpline].InterpolatePointsAtY(float64(y))
+			if err != nil {
+				return err
+			}
+			destEnd, err := auxSplines[iSpline + 1].InterpolatePointsAtY(float64(y))
+			if err != nil {
+				return err
+			}
+			if len(origStart) != 1 || len(origEnd) != 1 || len(destStart) != 1 || len(destEnd) != 1 {
+				return errors.New("stretchPixelsHorizontally: Invalid spline length (folds back on itself, or no length)")
+			}
+			mergePixelsInLine(true, y, iSpline != 0, iSpline != nSplines - 1, origStart[0].X, origEnd[0].X, destStart[0].X, destEnd[0].X, start, final)
+		}
+	}
+	return nil
+}
 
-					colorRes := start.At(int(math.Floor(sourcePivot)), y)
-					nextColor := start.At(int(math.Floor(sourcePivot))+1, y)
-					ratioNext := 0.0
-					if math.Floor(sourcePivot+normSourceDist/2) > math.Floor(sourcePivot) {
-						ratioNext = (sourcePivot + normSourceDist/2 - math.Floor(sourcePivot+normSourceDist)) / normSourceDist
-					}
-					colorRes = interpolateColors(nextColor, colorRes, ratioNext)
-					aux.Set(int(math.Floor(x)), y, colorRes)
-					sourcePivot += normSourceDist
-				}
+func stretchPixelsVertically(xStart, xEnd int, originalSplines, auxSplines []*parametricLineFloat64, start image.Image, final *image.RGBA64) error {
+	nSplines := len(originalSplines)
+	if nSplines != len(auxSplines) {
+		return errors.New("stretchPixelsVertically: Spline count does not match between start and final images")
+	}
+	for x := xStart; x < xEnd; x++ {
+		for iSpline := 0; iSpline < nSplines - 1; iSpline++ {
+			origStart, err := originalSplines[iSpline].InterpolatePointsAtX(float64(x))
+			if err != nil {
+				return err
 			}
-			originalStart = originalEnd
-			auxStart = auxEnd
+			origEnd, err := originalSplines[iSpline + 1].InterpolatePointsAtX(float64(x))
+			if err != nil {
+				return err
+			}
+			destStart, err := auxSplines[iSpline].InterpolatePointsAtX(float64(x))
+			if err != nil {
+				return err
+			}
+			destEnd, err := auxSplines[iSpline + 1].InterpolatePointsAtX(float64(x))
+			if err != nil {
+				return err
+			}
+			if len(origStart) > 1 || len(origEnd) > 1 || len(destStart) > 1 || len(destEnd) > 1 {
+				return errors.New("stretchPixelsVertically: Spline folds back on itself")
+			}
+			mergePixelsInLine(false, x, iSpline != 0, iSpline != nSplines - 1, origStart[0].Y, origEnd[0].Y, destStart[0].Y, destEnd[0].Y, start, final)
 		}
 	}
 	return nil
@@ -183,6 +172,7 @@ func mergePixelsInLine(horizontally bool, line int, fadeStartPixel, fadeEndPixel
 	pixelOrigSnapEnd := int(math.Floor(origEnd)) + 1
 	var origColor color.Color
 	lastColoredDestPixel := int(math.Floor(destStart))
+	fmt.Printf("**mergePixelsInLine**\norigStart=%v, origEnd=%v, destStart=%v, destEnd=%v\n", origStart, origEnd, destStart, destEnd)
 	if !fadeStartPixel {
 		lastColoredDestPixel--
 	}
