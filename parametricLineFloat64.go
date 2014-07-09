@@ -2,8 +2,8 @@ package gorph
 
 import (
 	"errors"
-	"strconv"
 	"fmt"
+	"strconv"
 )
 
 type parametricLineFloat64 struct {
@@ -57,10 +57,13 @@ func (p *parametricLineFloat64) InterpolatePointsAtX(xValue float64) (points []F
 	points = nil
 	err = nil
 	for i := 1; i < len(p.parametricPoints); i++ {
-		if p.parametricPoints[i].X >= xValue  && p.parametricPoints[i-1].X <= xValue{
-			points = append(points, LinearInterpolation(p.parametricPoints[i-1], p.parametricPoints[i], (xValue - p.parametricPoints[i-1].X)/(p.parametricPoints[i].X - p.parametricPoints[i-1].X)))
+		if p.parametricPoints[i].X > xValue && p.parametricPoints[i-1].X <= xValue {
+			points = append(points, LinearInterpolation(p.parametricPoints[i-1], p.parametricPoints[i], (xValue-p.parametricPoints[i-1].X)/(p.parametricPoints[i].X-p.parametricPoints[i-1].X)))
 			fmt.Printf("InterpolatePointsAtX, appended: (%v,%v)\n", points[len(points)-1].X, points[len(points)-1].Y)
 		}
+	}
+	if p.parametricPoints[len(p.parametricPoints)-1].X == xValue {
+		points = append(points, p.parametricPoints[len(p.parametricPoints)-1])
 	}
 	if len(points) == 0 {
 		err = errors.New("InterpolatePointsAtX: No points interpolated for value = " + strconv.FormatFloat(xValue, 'g', 8, 64))
@@ -75,11 +78,14 @@ func (p *parametricLineFloat64) InterpolatePointsAtY(yValue float64) (points []F
 	points = nil
 	err = nil
 	for i := 1; i < len(p.parametricPoints); i++ {
-		if p.parametricPoints[i].Y >= yValue  && p.parametricPoints[i-1].Y <= yValue {
-			fmt.Printf("Linearly interpolating %v and %v over %v", p.parametricPoints[i-1], p.parametricPoints[i], (yValue - p.parametricPoints[i-1].Y)/(p.parametricPoints[i].Y - p.parametricPoints[i-1].Y))
-			points = append(points, LinearInterpolation(p.parametricPoints[i-1], p.parametricPoints[i], (yValue - p.parametricPoints[i-1].Y)/(p.parametricPoints[i].Y - p.parametricPoints[i-1].Y)))
+		if p.parametricPoints[i].Y > yValue && p.parametricPoints[i-1].Y <= yValue {
+			fmt.Printf("Linearly interpolating %v and %v over %v\n", p.parametricPoints[i-1], p.parametricPoints[i], (yValue-p.parametricPoints[i-1].Y)/(p.parametricPoints[i].Y-p.parametricPoints[i-1].Y))
+			points = append(points, LinearInterpolation(p.parametricPoints[i-1], p.parametricPoints[i], (yValue-p.parametricPoints[i-1].Y)/(p.parametricPoints[i].Y-p.parametricPoints[i-1].Y)))
 			fmt.Printf("InterpolatePointsAtY, appended for i=%v: (%v,%v)\n", i, points[len(points)-1].X, points[len(points)-1].Y)
 		}
+	}
+	if p.parametricPoints[len(p.parametricPoints)-1].Y == yValue {
+		points = append(points, p.parametricPoints[len(p.parametricPoints)-1])
 	}
 	if len(points) == 0 {
 		err = errors.New("InterpolatePointsAtY: No points interpolated for value = " + strconv.FormatFloat(yValue, 'g', 8, 64))

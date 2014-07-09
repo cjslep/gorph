@@ -21,37 +21,41 @@ type InterpolationFunc func(start, end image.Point, fractionFromStart float64) F
 // start - starting image
 // dest - ending image
 // mGrid - a MorphGrid representing homogulous points on both images
-// timeInterp - function to use to interpolate cross-fading images over time
-//
-func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp InterpolationFunc) error {
+// timeInterp - function to use to interpolate cross-fading grids over time
+// nominalTimeConversion - function to covert actual time frame of grid to nominal time used
+// in cross fading. The parameter and returned value must lie in the range [0.0, 1.0]
+func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp InterpolationFunc, nominalTimeConversion func(float64) float64) ([]image.Image, error) {
 	startBounds := start.Bounds()
 	destBounds := dest.Bounds()
 	if !startBounds.Min.Eq(destBounds.Min) || !startBounds.Max.Eq(destBounds.Max) {
-		return errors.New("Morph: image bounds do not match")
+		return nil, errors.New("Morph: image bounds do not match")
 	}
 	// go?
+	results := make([]image.Image, 0, numMorphs)
 	for i := 1; i <= numMorphs; i++ {
 		baseTimeFrac := float64(i) / float64(numMorphs+1)
 		intermedGrid := mGrid.interpolatedGrid(timeInterp, baseTimeFrac)
 		auxGridSource := newFloat64CoordinateGrid()
 		auxGridDest := newFloat64CoordinateGrid()
 
-		// TODO: Factory creation function
+		// TODO: Factory creation function?
 		auxSourceImage := image.NewRGBA64(startBounds)
 		auxDestImage := image.NewRGBA64(destBounds)
+		intermedSourceImage := image.NewRGBA64(startBounds)
+		intermedDestImage := image.NewRGBA64(startBounds)
 
-		// TODO: Do this somewhere else
+		// TODO: Do this somewhere else?
 		maxX := intermedGrid.verticalGridlineCount()
 		maxY := intermedGrid.horizontalGridlineCount()
 		for x := 0; x < maxX; x++ {
 			for y := 0; y < maxY; y++ {
 				auxYPt, err := intermedGrid.point(y, x)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				auxXSourcePt, auxXDestPt, err := mGrid.Points(y, x)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				auxGridSource.addPoint(y, x, Float64Point{float64(auxXSourcePt.X), auxYPt.Y})
 				auxGridDest.addPoint(y, x, Float64Point{float64(auxXDestPt.X), auxYPt.Y})
@@ -62,42 +66,93 @@ func Morph(numMorphs int, start, dest image.Image, mGrid MorphGrid, timeInterp I
 		//   both original (source, dest) and aux (source, dest) images
 		sourceOriginalSplines, destOriginalSplines, nSplinesGrid, err := mGrid.allCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		sourceAuxSplines, nSplinesAuxSource, err := auxGridSource.allCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if nSplinesGrid != nSplinesAuxSource {
-			return errors.New("Given MorphGrid and source auxilary grid do not have the same number of splines.")
+			return nil, errors.New("Given MorphGrid and source auxilary grid do not have the same number of splines.")
 		}
 		destAuxSplines, nSplinesDestSource, err := auxGridDest.allCubicCatmullRomSplines(true, 0.5, startBounds.Max.Y-startBounds.Min.Y)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if nSplinesGrid != nSplinesDestSource {
-			return errors.New("Given MorphGrid and destination auxilary grid do not have the same number of splines.")
+			return nil, errors.New("Given MorphGrid and destination auxilary grid do not have the same number of splines.")
 		}
 
 		err = stretchPixelsHorizontally(startBounds.Min.Y, startBounds.Max.Y, sourceOriginalSplines, sourceAuxSplines, start, auxSourceImage)
+		if err != nil {
+			return nil, err
+		}
 		err = stretchPixelsHorizontally(startBounds.Min.Y, startBounds.Max.Y, destOriginalSplines, destAuxSplines, dest, auxDestImage)
+		if err != nil {
+			return nil, err
+		}
 
-		// Calculate Cubic Catmull-Rom spline equations for each horizontal line in
-		//   both aux (source, dest) and intermediate (source, dest) images
-		// Iterate over vertical rows in intermediate (source, dest) image
-		for x := startBounds.Min.X; x < startBounds.Max.X; x++ {
-			// For each line:
-			//  Get intercept of spline for aux (source, dest) and intermediate (source, dest) image
-			//  Map pixels from aux (source, dest) to intermediate (source, dest) image, using
-			//    fractional weights as necessary
+		// Auxiliary to intermediate, stretching vertically
+		sourceAuxSplines, nSplinesAuxSource, err = auxGridSource.allCubicCatmullRomSplines(false, 0.5, startBounds.Max.X-startBounds.Min.X)
+		if err != nil {
+			return nil, err
+		}
+		destAuxSplines, nSplinesDestSource, err = auxGridDest.allCubicCatmullRomSplines(false, 0.5, startBounds.Max.X-startBounds.Min.X)
+		if err != nil {
+			return nil, err
+		}
+		intermedSplines, nIntermedSplines, err := intermedGrid.allCubicCatmullRomSplines(false, 0.5, startBounds.Max.X-startBounds.Min.X)
+		if nIntermedSplines != nSplinesAuxSource {
+			return nil, errors.New("Auxilary grid and intermediate grid do not have the same number of splines.")
+		}
+
+		err = stretchPixelsVertically(startBounds.Min.X, startBounds.Max.X, sourceAuxSplines, intermedSplines, auxSourceImage, intermedSourceImage)
+		if err != nil {
+			return nil, err
+		}
+		err = stretchPixelsVertically(startBounds.Min.X, startBounds.Max.X, destAuxSplines, intermedSplines, auxDestImage, intermedDestImage)
+		if err != nil {
+			return nil, err
 		}
 
 		// Cross dissolve the two intermediate (source, dest) images by
 		//   using a weight (weight depends on i).
-		// Advanced: weight changes value non-linearly depending on i
-
+		results[i-1], err = CrossDissolve([]image.Image{intermedSourceImage, intermedDestImage}, []float64{nominalTimeConversion(baseTimeFrac), 1 - nominalTimeConversion(baseTimeFrac)})
 	}
-	return nil
+	return results, nil
+}
+
+// CrossDissolve weights a series of images on a pixel-by-pixel basis in order to
+// produce a resulting image. Returns an error if any of the image bounds do not
+// match, if one or no images are provided, or the number of images do not match
+// the number of weights.
+func CrossDissolve(dissolving []image.Image, weights []float64) (image.Image, error) {
+	nImages := len(dissolving)
+	nWeights := len(weights)
+	if nImages != nWeights {
+		return nil, errors.New("CrossDissolve: Number of images to dissolve does not match the number of weights")
+	}
+	if nImages <= 1 {
+		return nil, errors.New("CrossDissolve: Two or more images must be provided")
+	}
+	startBounds := dissolving[0].Bounds()
+	for i := 1; i < nImages; i++ {
+		if !startBounds.Min.Eq(dissolving[i].Bounds().Min) || !startBounds.Max.Eq(dissolving[i].Bounds().Max) {
+			return nil, errors.New("CrossDissolve: Image bounds do not match")
+		}
+	}
+	result := image.NewRGBA64(startBounds)
+	// go?
+	for x := startBounds.Min.X; x < startBounds.Max.X; x++ {
+		for y := startBounds.Min.Y; y < startBounds.Max.Y; y++ {
+			colorToSet := weightColor(dissolving[0].At(x, y), weights[0])
+			for i := 1; i < nImages; i++ {
+				colorToSet = addColors(colorToSet, weightColor(dissolving[i].At(x, y), weights[i]))
+			}
+			result.Set(x, y, colorToSet)
+		}
+	}
+	return result, nil
 }
 
 func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*parametricLineFloat64, start image.Image, final *image.RGBA64) error {
@@ -105,16 +160,13 @@ func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*
 	if nSplines != len(auxSplines) {
 		return errors.New("stretchPixelsHorizontally: Spline count does not match between start and final images")
 	}
-	fmt.Printf("originalSplines: %v\n", originalSplines[0])
-	fmt.Printf("auxSplines: %v\n", auxSplines[0])
 	for y := yStart; y < yEnd; y++ {
-		for iSpline := 0; iSpline < nSplines - 1; iSpline++ {
-			fmt.Printf("y=%v, iSpline=%v\n", y, iSpline)
+		for iSpline := 0; iSpline < nSplines-1; iSpline++ {
 			origStart, err := originalSplines[iSpline].InterpolatePointsAtY(float64(y))
 			if err != nil {
 				return err
 			}
-			origEnd, err := originalSplines[iSpline + 1].InterpolatePointsAtY(float64(y))
+			origEnd, err := originalSplines[iSpline+1].InterpolatePointsAtY(float64(y))
 			if err != nil {
 				return err
 			}
@@ -122,14 +174,14 @@ func stretchPixelsHorizontally(yStart, yEnd int, originalSplines, auxSplines []*
 			if err != nil {
 				return err
 			}
-			destEnd, err := auxSplines[iSpline + 1].InterpolatePointsAtY(float64(y))
+			destEnd, err := auxSplines[iSpline+1].InterpolatePointsAtY(float64(y))
 			if err != nil {
 				return err
 			}
 			if len(origStart) != 1 || len(origEnd) != 1 || len(destStart) != 1 || len(destEnd) != 1 {
 				return errors.New("stretchPixelsHorizontally: Invalid spline length (folds back on itself, or no length)")
 			}
-			mergePixelsInLine(true, y, iSpline != 0, iSpline != nSplines - 1, origStart[0].X, origEnd[0].X, destStart[0].X, destEnd[0].X, start, final)
+			mergePixelsInLine(true, y, iSpline != 0, iSpline != nSplines-1, origStart[0].X, origEnd[0].X, destStart[0].X, destEnd[0].X, start, final)
 		}
 	}
 	return nil
@@ -141,12 +193,12 @@ func stretchPixelsVertically(xStart, xEnd int, originalSplines, auxSplines []*pa
 		return errors.New("stretchPixelsVertically: Spline count does not match between start and final images")
 	}
 	for x := xStart; x < xEnd; x++ {
-		for iSpline := 0; iSpline < nSplines - 1; iSpline++ {
+		for iSpline := 0; iSpline < nSplines-1; iSpline++ {
 			origStart, err := originalSplines[iSpline].InterpolatePointsAtX(float64(x))
 			if err != nil {
 				return err
 			}
-			origEnd, err := originalSplines[iSpline + 1].InterpolatePointsAtX(float64(x))
+			origEnd, err := originalSplines[iSpline+1].InterpolatePointsAtX(float64(x))
 			if err != nil {
 				return err
 			}
@@ -154,14 +206,14 @@ func stretchPixelsVertically(xStart, xEnd int, originalSplines, auxSplines []*pa
 			if err != nil {
 				return err
 			}
-			destEnd, err := auxSplines[iSpline + 1].InterpolatePointsAtX(float64(x))
+			destEnd, err := auxSplines[iSpline+1].InterpolatePointsAtX(float64(x))
 			if err != nil {
 				return err
 			}
 			if len(origStart) > 1 || len(origEnd) > 1 || len(destStart) > 1 || len(destEnd) > 1 {
 				return errors.New("stretchPixelsVertically: Spline folds back on itself")
 			}
-			mergePixelsInLine(false, x, iSpline != 0, iSpline != nSplines - 1, origStart[0].Y, origEnd[0].Y, destStart[0].Y, destEnd[0].Y, start, final)
+			mergePixelsInLine(false, x, iSpline != 0, iSpline != nSplines-1, origStart[0].Y, origEnd[0].Y, destStart[0].Y, destEnd[0].Y, start, final)
 		}
 	}
 	return nil
