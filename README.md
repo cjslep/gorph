@@ -60,7 +60,20 @@ Note that the `dev-unstable` branch may not pass all tests.
 Usage / API
 ---
 
-This section will be more detailed once development stabilizes.
+This section will be more detailed once development stabilizes. The following functions are targeted:
+
+* `Resize` - Adjusts an image to new bounds. The aspect ratio may change. Anti-aliasing needed except in cases where pixels line up nicely.
+* `Scale` - Adjusts an image by a percent, preserving aspect ratio. Anti-aliasing needed except in cases where pixels line up nicely.
+* `CrossDissolve` - Applies a weight on a pixel-by-pixel basis between images to produce a faded new image.
+* `Morph` - Keyframe image interpolation based on a grid.
+* `MorphFeature` - Keyframe image interpolation based on a feature line.
+
+Additionally, internally there are helpful functions that are currently buried that need to be extracted, or need to be written:
+
+* `bicubicInterpolation` - Interpolates a pixel color from an image using bicubic interpolation.
+* `bilinearInterpolation` - Interpolates a pixel color from an image using bilinear interpolation, where color changes may not be continuous over square boundaries.
+* `nearestNeighborInterpolation` - Interpolates a pixel color from an image using the closest neighboring pixel.
+* `mergePixelsInLine` - Already written, could be broken out into simpler pieces.
 
 <a name="contributing"/>
 Contributing
