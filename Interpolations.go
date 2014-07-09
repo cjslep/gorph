@@ -55,10 +55,10 @@ func CubicCatmullRomInterpolation(points []Float64Point, alpha float64, totSteps
 	resultPts := make([]Float64Point, 0, totSteps)
 	if nPoints == 2 {
 		resultPts[0] = points[0]
-		for i := 1; i < totSteps - 1; i++ {
-			resultPts[i] = LinearInterpolation(points[0], points[1], float64(i) / float64(totSteps))
+		for i := 1; i < totSteps-1; i++ {
+			resultPts[i] = LinearInterpolation(points[0], points[1], float64(i)/float64(totSteps))
 		}
-		resultPts[totSteps - 1] = points[1]
+		resultPts[totSteps-1] = points[1]
 		return resultPts, nil
 	}
 	// Precompute the number of "steps" to take between each point

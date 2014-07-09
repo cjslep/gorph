@@ -44,7 +44,7 @@ func (f *float64CoordinateGrid) addPoint(horizLine, vertLine int, pt Float64Poin
 	}
 	indexAdded := f.xGridLines[vertLine].AddPoint(pt)
 	for i := 0; i < f.horizontalGridlineLen(); i++ {
-		if pt, index, err := f.yIndexLines[i].PointWithXValue(vertLine); pt.Y >= indexAdded && err == nil{
+		if pt, index, err := f.yIndexLines[i].PointWithXValue(vertLine); pt.Y >= indexAdded && err == nil {
 			_ = f.yIndexLines[i].RemovePoint(index)
 			pt.Y = pt.Y + 1
 			f.yIndexLines[i].AddPoint(pt)

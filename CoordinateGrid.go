@@ -44,7 +44,7 @@ func (c *coordinateGrid) addPoint(horizLine, vertLine int, pt image.Point) {
 	}
 	indexAdded := c.xGridLines[vertLine].AddPoint(pt)
 	for i := 0; i < c.horizontalGridlineLen(); i++ {
-		if pt, index, err := c.yIndexLines[i].PointWithXValue(vertLine); pt.Y >= indexAdded && err == nil{
+		if pt, index, err := c.yIndexLines[i].PointWithXValue(vertLine); pt.Y >= indexAdded && err == nil {
 			_ = c.yIndexLines[i].RemovePoint(index)
 			pt.Y = pt.Y + 1
 			c.yIndexLines[i].AddPoint(pt)
